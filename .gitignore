@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+env/
+.env
+
+# Modelos de Machine Learning
+*.pt
+*.pth
+
+# Videos y resultados (archivos pesados generados)
+videos_para_testear/
+resultados_videos/
+reporte_metricas_*.png
+
+# Carpetas de IDE
+.vscode/
+.idea/
+
+# Sistema Operativo
+.DS_Store
+Thumbs.db
