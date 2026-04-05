@@ -1,0 +1,36 @@
+det_thresh: 0.3
+max_age: 30
+max_obs: 50
+min_hits: 3
+iou_threshold: 0.3
+per_class: None
+nr_classes: 80
+_asso_func_base_name: iou
+detection_layout: AxisAlignedDetections(name='(x1,y1,x2,y2,conf,cls)', is_obb=False, det_cols=6, box_cols=4, conf_idx=4, cls_idx=5, output_cols=8)
+asso_func_name: iou
+is_obb: False
+frame_count: 0
+active_tracks: []
+per_class_active_tracks: None
+_first_frame_processed: False
+_first_dets_processed: False
+last_emb_size: None
+_plot_frame_idx: -1
+_removed_first_seen: {}
+_removed_expired: set()
+removed_display_frames: 10
+lost_stracks: []
+removed_stracks: []
+track_high_thresh: 0.6
+track_low_thresh: 0.1
+new_track_thresh: 0.7
+match_thresh: 0.8
+buffer_size: 30
+max_time_lost: 30
+kalman_filter: <boxmot.motion.kalman_filters.xywh.KalmanFilterXYWH object at 0x000001FF5D4132E0>
+proximity_thresh: 0.5
+appearance_thresh: 0.25
+with_reid: True
+model: <boxmot.reid.backends.pytorch_backend.PyTorchBackend object at 0x000001FF5D839870>
+cmc: <boxmot.motion.cmc.ecc.ECC object at 0x000001FF5D839D80>
+fuse_first_associate: False

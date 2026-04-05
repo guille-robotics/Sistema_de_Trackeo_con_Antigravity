@@ -17,6 +17,26 @@ class TrackingSystem:
             device=device,
             half=False
         )
+        
+        # Ajustes de hiperparámetros para mejorar la robustez del Tracking y evitar ID Switching
+        trk = self.tracker if not hasattr(self.tracker, 'tracker') else self.tracker.tracker
+        if hasattr(trk, 'max_age'):
+            trk.max_age = 150
+        if hasattr(trk, 'max_time_lost'):
+            trk.max_time_lost = 150
+        if hasattr(trk, 'buffer_size'):
+            trk.buffer_size = 150
+        if hasattr(trk, 'appearance_thresh'):
+            trk.appearance_thresh = 0.6  # Relajar umbral de apariencia visual (ayuda cuando la prenda rota)
+        if hasattr(trk, 'match_thresh'):
+            trk.match_thresh = 0.9 # Relajar umbral de casamiento espacial y visual
+        if hasattr(trk, 'proximity_thresh'):
+            trk.proximity_thresh = 0.6
+        if hasattr(trk, 'track_high_thresh'):
+            trk.track_high_thresh = 0.4  # Evitar perder tracks si baja la confianza
+        if hasattr(trk, 'new_track_thresh'):
+            trk.new_track_thresh = 0.5
+
         self.trajectories = defaultdict(list)
         self.colors = {}
 
