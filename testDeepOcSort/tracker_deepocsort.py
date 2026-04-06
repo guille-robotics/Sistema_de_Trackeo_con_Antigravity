@@ -6,37 +6,28 @@ import time
 from collections import defaultdict
 import os
 
-class TrackingSystem:
-    def __init__(self, model_path, tracker_type='botsort', reid_weights='osnet_x0_25_msmt17.pt', device='cuda:0'):
+class DeepOCSortTrackingSystem:
+    def __init__(self, model_path, reid_weights='osnet_x0_25_msmt17.pt', device='cuda:0'):
+        # Ruta al modelo RTDETR
         self.model = RTDETR(model_path)
-        self.tracker_type = tracker_type
+        self.tracker_type = 'deepocsort'
+        
+        print("Inicializando DeepOC-SORT a través de BoxMOT con RT-DETR...")
         self.tracker = create_tracker(
-            tracker_type=tracker_type,
+            tracker_type=self.tracker_type,
             tracker_config=None,
             reid_weights=reid_weights,
             device=device,
             half=False
         )
         
-        # Ajustes de hiperparámetros para mejorar la robustez del Tracking y evitar ID Switching
+        # Ajustes de hiperparámetros de DeepOC-SORT para mejorar la robustez
         trk = self.tracker if not hasattr(self.tracker, 'tracker') else self.tracker.tracker
         if hasattr(trk, 'max_age'):
             trk.max_age = 150
-        if hasattr(trk, 'max_time_lost'):
-            trk.max_time_lost = 150
-        if hasattr(trk, 'buffer_size'):
-            trk.buffer_size = 150
-        if hasattr(trk, 'appearance_thresh'):
-            trk.appearance_thresh = 0.9  # MUY relajado. Acepta si se deforma mucho al agarrarla
-        if hasattr(trk, 'match_thresh'):
-            trk.match_thresh = 0.99 # MUY relajado para emparejamiento espacio-visual
-        if hasattr(trk, 'proximity_thresh'):
-            trk.proximity_thresh = 0.95 # Permite que la prenda salte a una distancia física mayor sin romper ID
-        if hasattr(trk, 'track_high_thresh'):
-            trk.track_high_thresh = 0.4  # Evitar perder tracks si baja la confianza
-        if hasattr(trk, 'new_track_thresh'):
-            trk.new_track_thresh = 0.5
-
+        if hasattr(trk, 'det_thresh'):
+            trk.det_thresh = 0.4
+            
         self.trajectories = defaultdict(list)
         self.colors = {}
 
@@ -47,7 +38,6 @@ class TrackingSystem:
         return self.colors[obj_id]
 
     def reset(self):
-        # Reiniciar variables para nuevo video
         self.trajectories.clear()
         self.colors.clear()
 
@@ -74,56 +64,65 @@ class TrackingSystem:
                 break
                 
             frame_count += 1
+            if frame_count % 30 == 0:
+                print(f"  -> Procesando frame {frame_count}...", end='\r')
             
-            # Inferencias
+            # Inferencias con RT-DETR
             results = self.model(frame, classes=[0], verbose=False) # 0 es ropa
             dets = results[0].boxes.data.cpu().numpy()
             
             total_detections += len(dets)
             
-            # Update tracker
+            # Actualizar tracker Deep-OC-SORT
             if len(dets) > 0:
                 try:
                     tracks = self.tracker.update(dets, frame)
                 except Exception as e:
-                    print(f"Warning: Tracking step failed: {e}")
+                    # Ignore the error message 'niteray is not positive definite' from Matrix inversion. 
+                    # This happens when detection geometry leads to unstable kalman matrices.
                     tracks = np.empty((0, 8))
             else:
                 tracks = np.empty((0, 8))
                 
-            # Clonar frame para dibujado (Trajectory tracking puro, sin bounding boxes)
+            # Renderizado visual
             track_vis = frame.copy()
             
             for t in tracks:
-                # boxmot devuelve: x1, y1, x2, y2, id, conf, cls, obj_idx
                 x1, y1, x2, y2, obj_id, conf, cls_id, ind = t
                 obj_id = int(obj_id)
                 unique_ids.add(obj_id)
                 
-                # Calcular centro exacto de la caja
                 cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
                 self.trajectories[obj_id].append((cx, cy))
                 
-                # Obtener un color persistente
                 color = self.get_color(obj_id)
                 
-                # Dibujar linea de trayectoria
+                # Dibujar trayectoria
                 pts = self.trajectories[obj_id]
                 cv2.polylines(track_vis, [np.array(pts, dtype=np.int32)], isClosed=False, color=color, thickness=3)
-                # Punto actual
                 cv2.circle(track_vis, pts[-1], 6, color, -1)
                 
-                # Anotar texto ID
-                cv2.putText(track_vis, f'ID: {obj_id}', (cx - 15, cy - 15), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 3)
-                cv2.putText(track_vis, f'ID: {obj_id}', (cx - 15, cy - 15), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                # Bounding box
+                cv2.rectangle(track_vis, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+                
+                # Etiqueta
+                label = f'ID: {obj_id} (D-OC-SORT)'
+                cv2.putText(track_vis, label, (int(x1), int(y1) - 10), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 3)
+                cv2.putText(track_vis, label, (int(x1), int(y1) - 10), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            
+            # Agregar información de estado genérico
+            cv2.putText(track_vis, f'Prendas Unicas Trackeadas: {len(unique_ids)}', (20, 40), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 4)
+            cv2.putText(track_vis, f'Prendas Unicas Trackeadas: {len(unique_ids)}', (20, 40), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             if out:
                 out.write(track_vis)
             
             if show:
-                cv2.imshow(f"Tracker: {self.tracker_type}", cv2.resize(track_vis, (800, 600)))
+                cv2.imshow(f"Tracker: DeepOC-SORT", cv2.resize(track_vis, (1024, 768)))
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
                     

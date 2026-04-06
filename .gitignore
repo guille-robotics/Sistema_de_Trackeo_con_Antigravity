@@ -24,3 +24,14 @@ reporte_metricas_*.png
 # Sistema Operativo
 .DS_Store
 Thumbs.db
+
+# Resultados específicos de pruebas con trackers
+resultados_deepocsort/
+resultados_video*/
+
+# Repositorios externos o clonados (evitar subir submódulos o dependencias pesadas)
+testDeepOcSort/Deep-OC-SORT/
+
+# Pesos de reidentificación y descargas residuales
+*.weights
+*.tar

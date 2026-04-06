@@ -8,8 +8,10 @@ import os
 
 class TrackingSystem:
     def __init__(self, model_path, tracker_type='botsort', reid_weights='osnet_x0_25_msmt17.pt', device='cuda:0'):
+        # Ruta al modelo RTDETR
         self.model = RTDETR(model_path)
         self.tracker_type = tracker_type
+        
         self.tracker = create_tracker(
             tracker_type=tracker_type,
             tracker_config=None,
@@ -19,6 +21,7 @@ class TrackingSystem:
         )
         
         # Ajustes de hiperparámetros para mejorar la robustez del Tracking y evitar ID Switching
+        # Estos fueron los que funcionaron bien en las pruebas de movimiento e interposición.
         trk = self.tracker if not hasattr(self.tracker, 'tracker') else self.tracker.tracker
         if hasattr(trk, 'max_age'):
             trk.max_age = 150
@@ -47,7 +50,6 @@ class TrackingSystem:
         return self.colors[obj_id]
 
     def reset(self):
-        # Reiniciar variables para nuevo video
         self.trajectories.clear()
         self.colors.clear()
 
@@ -91,29 +93,23 @@ class TrackingSystem:
             else:
                 tracks = np.empty((0, 8))
                 
-            # Clonar frame para dibujado (Trajectory tracking puro, sin bounding boxes)
+            # Clonar frame para dibujado
             track_vis = frame.copy()
             
             for t in tracks:
-                # boxmot devuelve: x1, y1, x2, y2, id, conf, cls, obj_idx
                 x1, y1, x2, y2, obj_id, conf, cls_id, ind = t
                 obj_id = int(obj_id)
                 unique_ids.add(obj_id)
                 
-                # Calcular centro exacto de la caja
                 cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
                 self.trajectories[obj_id].append((cx, cy))
                 
-                # Obtener un color persistente
                 color = self.get_color(obj_id)
                 
-                # Dibujar linea de trayectoria
                 pts = self.trajectories[obj_id]
                 cv2.polylines(track_vis, [np.array(pts, dtype=np.int32)], isClosed=False, color=color, thickness=3)
-                # Punto actual
                 cv2.circle(track_vis, pts[-1], 6, color, -1)
                 
-                # Anotar texto ID
                 cv2.putText(track_vis, f'ID: {obj_id}', (cx - 15, cy - 15), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 3)
                 cv2.putText(track_vis, f'ID: {obj_id}', (cx - 15, cy - 15), 
