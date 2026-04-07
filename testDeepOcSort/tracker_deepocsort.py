@@ -57,6 +57,11 @@ class DeepOCSortTrackingSystem:
         
         total_detections = 0
         unique_ids = set()
+        unique_ids_per_class = defaultdict(set)
+        
+        total_rtdetr_time = 0.0
+        total_tracking_time = 0.0
+        total_pipeline_time = 0.0
         
         while cap.isOpened():
             ret, frame = cap.read()
@@ -67,13 +72,19 @@ class DeepOCSortTrackingSystem:
             if frame_count % 30 == 0:
                 print(f"  -> Procesando frame {frame_count}...", end='\r')
             
+            frame_start_time = time.time()
+            
             # Inferencias con RT-DETR
-            results = self.model(frame, classes=[0], verbose=False) # 0 es ropa
+            rtdetr_start = time.time()
+            results = self.model(frame, classes=[0, 1, 5], conf=0.25, verbose=False) # Ropa, Caja, Otro
             dets = results[0].boxes.data.cpu().numpy()
+            rtdetr_end = time.time()
+            total_rtdetr_time += (rtdetr_end - rtdetr_start)
             
             total_detections += len(dets)
             
             # Actualizar tracker Deep-OC-SORT
+            tracking_start = time.time()
             if len(dets) > 0:
                 try:
                     tracks = self.tracker.update(dets, frame)
@@ -83,6 +94,11 @@ class DeepOCSortTrackingSystem:
                     tracks = np.empty((0, 8))
             else:
                 tracks = np.empty((0, 8))
+            tracking_end = time.time()
+            total_tracking_time += (tracking_end - tracking_start)
+            
+            frame_end_time = time.time()
+            total_pipeline_time += (frame_end_time - frame_start_time)
                 
             # Renderizado visual
             track_vis = frame.copy()
@@ -90,7 +106,9 @@ class DeepOCSortTrackingSystem:
             for t in tracks:
                 x1, y1, x2, y2, obj_id, conf, cls_id, ind = t
                 obj_id = int(obj_id)
+                cls_id = int(cls_id)
                 unique_ids.add(obj_id)
+                unique_ids_per_class[cls_id].add(obj_id)
                 
                 cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
                 self.trajectories[obj_id].append((cx, cy))
@@ -138,6 +156,13 @@ class DeepOCSortTrackingSystem:
         return {
             "total_detections": total_detections,
             "unique_ids": len(unique_ids),
+            "unique_ids_per_class": {k: len(v) for k, v in unique_ids_per_class.items()},
             "avg_fps": avg_fps,
-            "total_frames": frame_count
+            "total_frames": frame_count,
+            "total_rtdetr_time": total_rtdetr_time,
+            "total_tracking_time": total_tracking_time,
+            "total_pipeline_time": total_pipeline_time,
+            "avg_rtdetr_time": total_rtdetr_time / frame_count if frame_count > 0 else 0,
+            "avg_tracking_time": total_tracking_time / frame_count if frame_count > 0 else 0,
+            "avg_pipeline_time": total_pipeline_time / frame_count if frame_count > 0 else 0
         }

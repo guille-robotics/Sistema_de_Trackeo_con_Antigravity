@@ -28,6 +28,8 @@ Thumbs.db
 # Resultados específicos de pruebas con trackers
 resultados_deepocsort/
 resultados_video*/
+resultados_thr_correcto/
+
 
 # Repositorios externos o clonados (evitar subir submódulos o dependencias pesadas)
 testDeepOcSort/Deep-OC-SORT/
